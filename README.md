@@ -1,7 +1,7 @@
 # IMU-Analysis
 UROP Code for ACL, analyzing the performance of a drone IMU when compared to the measurements obtained by the lab's motion capture system.
-Makes use of matlab_utilities and matlab-utils repositories.  Run code on bag files of recorded data.
-Still a work in progress, working on improving the display of the outputs
+Makes use of matlab_utilities and matlab-utils repositories.  Run code on bag files of recorded data, requires data from both the drone IMU
+and a motion capture system or similar reference.
 An overview of the script outputs:
 1.) Plots drone position and velocity in three dimensions
 2.) Plots IMU vs. Motion Capture data for phi and theta attitudes along with gyroscope measurements
