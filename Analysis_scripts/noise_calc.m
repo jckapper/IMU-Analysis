@@ -3,7 +3,7 @@
 function [thrust_on_std,thrust_off_std,bias]  = noise_calc(vector_imu, vector_tru, t_tru, t_imu, t_com, F_com)
 
 %Finds shortest vector length and uses that 
-[lengthN_use, time_vect] =check_length_with_time(vector_imu, vector_tru, t_imu, t_tru);
+[lengthN_use, time_vect] = check_length_with_time(vector_imu, vector_tru, t_imu, t_tru);
 errorN = zeros(1,lengthN_use);
 
 %Calculates the error between each point of the two vectors
@@ -15,41 +15,30 @@ end
 %Initializing variables for the bias calculation
 error_minus_bias = zeros(1,length(errorN));
 sum = 0;
-counter = 0;
-index_counter = 1;
+interval_start = 1;
 bias = zeros(1,length(errorN));
 
 %Calculates zero mean error
 for i=1:length(errorN)
     %keeps track of the sum and index for the specified interval
     sum = sum + errorN(i);
-    index = i + 1;
-    counter = counter + 1;
-
-    %This version of my code uses a counter to trigger the mean calculation
-    %because the delta t in recorded data is very small, that mean is then 
-    %added to the bias vector
-    if counter == 2
-        mean_dt = sum/counter;
+    
+    %Local mean is calculated every two data points because the delta t in 
+    %recorded data is very small, that mean is then added to the bias vector
+    if mod(i,2) == 0
+        disp('yes')
+        mean_dt = sum/2;
         bias(1,i) = mean_dt;
-        
-        %Was having trouble with the different sizes of the vectors earlier
-        %this was to check if they were the same
-        if index > length(errorN)
-        disp('error')
-        else
             
-            %Subtracts the bias from the error data over the specified
-            %index interval
-            for j=index_counter:index
-                error_minus_bias(j) = (errorN(j) - mean_dt);
-            end
+        %Subtracts the bias from the error data over the specified
+        %index interval
+        for j=interval_start:i
+            error_minus_bias(j) = (errorN(j) - mean_dt);
         end
         
         %Resets counters for the next iteration
-        index_counter = index;
+        interval_start = i;
         sum = 0;
-        counter = 0;
     end
 end
 
@@ -57,55 +46,41 @@ end
 %intervals into a two rowed matrix
 zero_mean_errorN = error_minus_bias;
 zero_mean_with_time = [zero_mean_errorN; time_vect]; %Matrix of zero mean with respective time stamps
-thrust_with_time = [F_com;t_com];
-
-%I experimented with using maps to contain the std's and tie them to their
-%time interval but I couldn't make it display conveniently so I stuck with
-%a matrix of STD values only
+thrust_with_time = [F_com; t_com];
 
 %These two vectors will contain the std's for respective time periods, if
 %there are three thrust on periods, thrust_on_std will have three entries
 thrust_on_std = [];
 thrust_off_std = [];
 
-%Last index keeps track of what index the loop is currently on while
-%finished keeps the while loop going
-index_counter = 1;
-finished = false;
+%Used to keep track of current index for iteration
+index = 1;
 
 %This while statement only stops after the whole vector has been iterated
 %over, this is kept track of using the finished boolean
-while finished == false
-    
-    %This ends the loop when the last index has been reached.  Break was
-    %necessary because it would not properly finish without
-    if index_counter >= length(thrust_with_time)
-        finished = true;
+while true
+    %This ends the loop when the last index has been reached.
+    if index >= length(thrust_with_time)
         break
     end
     
-    %Initializes vectors that are used in calculating the std for specific
-    %time intervals
-    time_on = [];
-    time_off = [];
-    data_for_std= [];
+    data_for_std= [];% Stores data for std calculation
     
     %Checks if the thrust is zero and if so continues to iterate down the
     %thrust vector until thrust is not zero
-    if thrust_with_time(1, index_counter) == 0  
-        
+    if thrust_with_time(1, index) == 0  
+        time_off = [];
         %Each index where thrust is zero, the time value is added to the
         %time_off matrix and the index_counter is updated
-        while thrust_with_time(1, index_counter) == 0
+        while thrust_with_time(1, index) == 0
             
             %Not preallocating because final length is unknown
-            time_off = [time_off;thrust_with_time(2,index_counter)];
-            index_counter = index_counter + 1;
+            time_off = [time_off;thrust_with_time(2,index)];
+            index = index + 1;
             
             %Catch statement to check if index_counter has exceeded the
             %length of the thrust matrix
-            if index_counter >= length(thrust_with_time)
-                %disp('break in thrust off code')
+            if index >= length(thrust_with_time)
                 break
             end
         end
@@ -117,7 +92,7 @@ while finished == false
             
             %Not preallocating because length of the off vector is unknown
             if zero_mean_with_time(2,s) >= time_off(1) && zero_mean_with_time(2,s) <= time_off(length(time_off))
-                data_for_std = [data_for_std;zero_mean_with_time(2,s)];
+                data_for_std = [data_for_std;zero_mean_with_time(1,s)];
                 
             end
         end
@@ -132,24 +107,22 @@ while finished == false
         end
             
     else
-        
+        time_on = [];
         %If thrust is on, this code block triggers, performs the exact same
         %function as above but for non-zero thrust values
-        while thrust_with_time(1, index_counter) ~= 0
+        while thrust_with_time(1, index) ~= 0
             
             %Each index where thrust is non-zero, the time value is added to the
             %time_on matrix and the index_counter is updated, Not 
             %preallocating because length of the off vector is unknown
-            time_on = [time_on;thrust_with_time(2,index_counter)];
-            index_counter = index_counter + 1;
+            time_on = [time_on;thrust_with_time(2,index)];
+            index = index + 1;
             
             %Catch statement to check if index_counter has exceeded the
             %length of the thrust matrix
-            if index_counter >= length(thrust_with_time)
-                disp('break in thrust on code')
+            if index >= length(thrust_with_time)
                 break
-            end
-            
+            end     
         end
         
         %Iterates over the zero mean error data, finding all the data
@@ -159,7 +132,7 @@ while finished == false
             
             %Not preallocating because length of the off vector is unknown
             if zero_mean_with_time(2,s) >= time_on(1) && zero_mean_with_time(2,s) <= time_on(length(time_on))
-                data_for_std = [data_for_std;zero_mean_with_time(2,s)];
+                data_for_std = [data_for_std;zero_mean_with_time(1,s)];
                 
             end
         end
@@ -178,7 +151,7 @@ while finished == false
         
     end
 end
-% %Plotting the two datasets to compare
+% %Plot shows data is converted to zero-mean
 % figure
 % plot(time_vect, error_minus_bias)
 % hold on
